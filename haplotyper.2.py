@@ -1,13 +1,12 @@
 #!/usr/bin/python
 
+import collections
 import sys
-
+from bam_parser import parse_bam
 ingenotypes = sys.argv[1]
 snps = sys.argv[2]
-#indie = sys.argv[3]
 
 complement = {'A': 'T', 'C': 'G', 'T': 'A', 'G': 'C'}
-
 
 snps_dict = {}
 
@@ -18,7 +17,7 @@ with open( snps, 'r') as infile:
         for linea in lineas:
 
                 locus = linea.split('\t')[1]
-		snps_dict[locus] = []
+                snps_dict[locus] = []
 
 with open( snps, 'r') as infile:
 
@@ -34,87 +33,49 @@ with open( snps, 'r') as infile:
 
 # print(snps_dict)
 
-haplotypes = []
+haplotypes = {}
 nucs = ['A', 'T', 'G', 'C']
 
-with open( ingenotypes, 'r') as infile:
+bam = parse_bam( ingenotypes )
 
-	lineas = infile.readlines()
+aligned_loci = set([ r.split(',')[0] for r in bam ])
+# print(aligned_loci, dict(collections.Counter(aligned_loci)))
 
-	for linea in lineas:
-		indie = linea.split(' ')[0]
-		haplotype = ''
-		locus = linea.split(' ')[1]
-		offset = int(linea.split(' ')[5])
-		seq = linea.split(' ')[7].strip()
-		read = linea.split(' ')[2]
-		cigar = linea.split(' ')[6]
-		flag = int(linea.split(' ')[4])
+for locus in aligned_loci:
+	haplotypes[ locus ] = []
 
-		cigar_n = cigar.replace('X', '=').replace('I', '=').replace('D', '=').replace('N', '=').replace('M', '=').replace('S', '=').replace('H', '=').split('=')
-		cigar_l = [i for i in cigar if not i.isdigit()]
-		# print(cigar_n, cigar_l)
-		cigar_list = []
-		for i in range(0, len(cigar_l)):
+for r in bam:
 
-			cigar_element = tuple([cigar_n[i], cigar_l[i]])
-			cigar_list.append(cigar_element)
+	locus = r.split(',')[0]
+	read =  r.split(',')[1]
+	aligned_seq = r.split(',')[2]
+	offset = int(r.split(',')[3])
 
-		# print(cigar_list)
-		
-		seq_tr = ''
-		# print(locus, seq)
-
+	haplotype = []
 	
-		for c in cigar_list:
-				# try:
-
-			if c[1] == 'M' or c[1] == '=' or c[1] == 'X':
-				seq_tr += seq[0:int(c[0])]
-				seq = seq[int(c[0]) :len(seq)]
-				#continue
-
-			elif c[1] == 'D' or c[1] == 'N':
-				seq_tr += int(c[0]) * '-'
-				#continue
-
-			elif c[1] == 'I' or c[1] == 'S' or c[1] == 'H' :
-				seq = seq[int(c[0]) :len(seq)]						
-				#continue
-				# except ValueError:
-					# print(cigar_list)
-		# print(seq_tr)
-				
-		# break
+	if locus in snps_dict.keys():	
 		
-		if flag == '16' or flag == '1040':
+		for snp in snps_dict[ locus ] :
+		
 			try:
-				seq_tr = "".join([complement[x] for x in seq_tr])
-			except KeyError:
-				pass
-		else:
-			seq_tr = seq_tr			
-		for snp in snps_dict[locus]:
-			# print('We are at the SNP pos loop')
-			pos = snp[0]
+#			if snp[0] < len( aligned_seq )  and snp[0] - offset >= 0 and snp[0] - offset < len( aligned_seq ):
 			
-			try:
-				#if seq_tr[ pos - offset ] in (snp[1], snp[2]):
-				#	haplotype += seq_tr[ pos - offset ]
-				haplotype += seq_tr[ pos - offset ]
+				#if aligned_seq[ snp[0] - 1] in [ snp[1], snp[2] ]:
+				haplotype.append( aligned_seq[ snp[0] - offset -1] )
+
 				#else:
-				#	haplotype += '*'
+				#	haplotype.append( '-' )
 			except IndexError:
-				# print('IndexError')
-				haplotype += '*'
-		# if '-' not in haplotype:
-		print(tuple([indie, locus, read, flag, offset, haplotype]))
+				haplotype.append('-')
+	haplotypes[locus].append( ''.join( haplotype ) )
 
 
-#for hap in haplotypes:
-#	print('We are at the last step')
-#	if '-' not in hap[3]:
-#	print(hap)
 
-		
-			
+for hap in haplotypes:
+	hap_counts = dict(collections.Counter( haplotypes[hap] ) )
+	max_count = max( [hap_counts[c] for c in hap_counts ] )
+	for r in hap_counts:
+		if hap_counts[r] / max_count >= float(sys.argv[3]):
+			print(hap, r, hap_counts[r] )
+
+
