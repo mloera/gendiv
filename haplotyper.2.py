@@ -8,6 +8,8 @@ snps = sys.argv[2]
 
 complement = {'A': 'T', 'C': 'G', 'T': 'A', 'G': 'C'}
 
+### Creating a dictionary of SNP positions
+
 snps_dict = {}
 
 with open( snps, 'r') as infile:
@@ -31,7 +33,6 @@ with open( snps, 'r') as infile:
 			minor_allele = linea.split('\t')[6].split(":")[0]
 			snps_dict[locus].append(tuple([pos, major_allele, minor_allele]))
 
-# print(snps_dict)
 
 haplotypes = {}
 nucs = ['A', 'T', 'G', 'C']
@@ -39,11 +40,12 @@ nucs = ['A', 'T', 'G', 'C']
 bam = parse_bam( ingenotypes )
 
 aligned_loci = set([ r.split(',')[0] for r in bam ])
-# print(aligned_loci, dict(collections.Counter(aligned_loci)))
 
 for locus in aligned_loci:
 	haplotypes[ locus ] = []
 
+
+### Parsing BAM file and extracting the SNP positions from reads
 for r in bam:
 
 	locus = r.split(',')[0]
@@ -58,18 +60,16 @@ for r in bam:
 		for snp in snps_dict[ locus ] :
 		
 			try:
-#			if snp[0] < len( aligned_seq )  and snp[0] - offset >= 0 and snp[0] - offset < len( aligned_seq ):
 			
-				#if aligned_seq[ snp[0] - 1] in [ snp[1], snp[2] ]:
 				haplotype.append( aligned_seq[ snp[0] - offset -1] )
 
-				#else:
-				#	haplotype.append( '-' )
 			except IndexError:
 				haplotype.append('-')
 	haplotypes[locus].append( ''.join( haplotype ) )
 
 
+### Getting normalized haplotype counts (based on the maximum count) and
+### filtering haplotypes based on a user defined threshold (0 - 1)
 
 for hap in haplotypes:
 	hap_counts = dict(collections.Counter( haplotypes[hap] ) )
